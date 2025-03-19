@@ -1,10 +1,11 @@
 import yt_dlp
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox
 import threading
 import os
 import sys
 import time  # Zaman bilgisini almak için
+import json
 import requests
 from PIL import Image, ImageTk
 from io import BytesIO
@@ -26,6 +27,26 @@ def load_icon_from_url(url):
     except Exception as e:
         print(f"İcon yüklenirken hata oluştu: {e}")
         return None
+
+def load_last_folder():
+    """ Son kullanılan klasörü yükler. """
+    try:
+        if os.path.exists('settings.json'):
+            with open('settings.json', 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+                return settings.get('last_folder', '')
+    except Exception as e:
+        print(f"Ayarlar yüklenirken hata oluştu: {e}")
+    return ''
+
+def save_last_folder(folder_path):
+    """ Son kullanılan klasörü kaydeder. """
+    try:
+        settings = {'last_folder': folder_path}
+        with open('settings.json', 'w', encoding='utf-8') as f:
+            json.dump(settings, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"Ayarlar kaydedilirken hata oluştu: {e}")
 
 def downloader(video_url, save_path, audio_only=False, progress_callback=None):
     def hook(d):
@@ -70,6 +91,7 @@ def browse_folder():
     if folder_selected:
         entry_path.delete(0, tk.END)
         entry_path.insert(0, folder_selected)
+        save_last_folder(folder_selected)
 
 def start_download():
     video_url = entry_url.get()
@@ -82,17 +104,26 @@ def start_download():
         messagebox.showwarning("Uyarı", "Lütfen tüm alanları doldurunuz.")
 
 def update_progress(progress):
+    progress_bar['value'] = progress
     label_status.config(text=f"İndirme durumu: {progress}%")
 
 def reset_fields():
     entry_url.delete(0, tk.END)
     var_audio.set(False)
+    progress_bar['value'] = 0
+    label_status.config(text="İndirme durumu: 0%")
 
 # Tkinter arayüzü
 root = tk.Tk()
 root.title("Video Downloader Pro")
-root.geometry("400x300+750+300")
-root.minsize(400,300)
+root.geometry("500x450+750+300")
+root.minsize(500, 450)
+
+# Stil ayarları
+style = ttk.Style()
+style.configure('TButton', padding=5)
+style.configure('TLabel', padding=5)
+style.configure('TEntry', padding=5)
 
 # Icon'u ayarla
 try:
@@ -101,26 +132,45 @@ try:
 except Exception as e:
     print(f"İcon yüklenirken hata oluştu: {e}")
 
-# URL giriş alanı
-tk.Label(root, text="Video URL:").pack(pady=5)
-entry_url = tk.Entry(root, width=50)
-entry_url.pack(pady=5)
+# Ana frame
+main_frame = ttk.Frame(root, padding="10")
+main_frame.pack(fill=tk.BOTH, expand=True)
 
-# Kayıt yeri seçme butonu
-tk.Label(root, text="Kaydetme Konumu:").pack(pady=5)
-entry_path = tk.Entry(root, width=50)
-entry_path.pack(pady=5)
-tk.Button(root, text="Gözat", command=browse_folder).pack(pady=5)
+# URL giriş alanı
+url_frame = ttk.Frame(main_frame)
+url_frame.pack(fill=tk.X, pady=5)
+ttk.Label(url_frame, text="Video URL:").pack(side=tk.LEFT)
+entry_url = ttk.Entry(url_frame, width=50)
+entry_url.pack(side=tk.LEFT, padx=5)
+
+# Kayıt yeri seçme alanı
+path_frame = ttk.Frame(main_frame)
+path_frame.pack(fill=tk.X, pady=5)
+ttk.Label(path_frame, text="Kaydetme Konumu:").pack(side=tk.LEFT)
+entry_path = ttk.Entry(path_frame, width=50)
+entry_path.pack(side=tk.LEFT, padx=5)
+ttk.Button(path_frame, text="Gözat", command=browse_folder).pack(side=tk.LEFT)
+
+# Son kullanılan klasörü yükle
+last_folder = load_last_folder()
+if last_folder and os.path.exists(last_folder):
+    entry_path.insert(0, last_folder)
 
 # MP3 veya Video seçimi
 var_audio = tk.BooleanVar()
-tk.Checkbutton(root, text="Sadece Ses (MP3)", variable=var_audio).pack(pady=5)
+ttk.Checkbutton(main_frame, text="Sadece Ses (MP3)", variable=var_audio).pack(pady=5)
 
 # İndirme butonu
-tk.Button(root, text="İndir", command=start_download).pack(pady=5)
+ttk.Button(main_frame, text="İndir", command=start_download).pack(pady=10)
+
+# Progress bar
+progress_frame = ttk.Frame(main_frame)
+progress_frame.pack(fill=tk.X, pady=5)
+progress_bar = ttk.Progressbar(progress_frame, mode='determinate', length=400)
+progress_bar.pack(fill=tk.X)
 
 # İndirme durumu
-label_status = tk.Label(root, text="İndirme durumu: 0%")
-label_status.pack(pady=10)
+label_status = ttk.Label(main_frame, text="İndirme durumu: 0%")
+label_status.pack(pady=5)
 
 root.mainloop()
